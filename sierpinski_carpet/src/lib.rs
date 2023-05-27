@@ -4,38 +4,44 @@ use stopwatch::Stopwatch;
 
 pub fn create(steps: u32, color_option: u32) {
     let colors = Colors::get_colors(color_option);
-    let file_path = get_image_path(steps, colors.name);
+    let file_path = get_image_path(steps, &colors.name);
     if image_exists(&file_path) {
         println!("Image with that configuration already exists on this folder.");
         return;
     }
 
-    let mut side = (3 as u32).pow(steps);
-    side = cmp::max(743, side);
-
-    let sqr = Square { x0: 0, y0: 0, len: side };
-
-    let mut carpet = RgbImage::from_fn(side, side, |_, _| colors.background);
-    sierpinski_carpet(sqr, &mut carpet, &colors.colors, steps);
-
+    let side = cmp::max(743, (3 as u32).pow(steps));
+    let carpet = sierpinski_carpet(steps, side, colors);
     save_image(carpet, side, file_path)
 }
 
-fn sierpinski_carpet(sqr: Square, mut img: &mut RgbImage, colors: &[Rgb<u8>], steps: u32) {
-    let color = colors[steps as usize % colors.len()];
-    fill_center_square(&sqr, &mut img, color);
+fn sierpinski_carpet(steps: u32, side: u32, colors: Colors) -> RgbImage {
+    let mut carpet = RgbImage::from_fn(side, side, |_, _| colors.background);
+    let sqr = Square { x0: 0, y0: 0, len: side };
+    let mut queue = vec![(sqr, steps)];
 
-    if steps == 0 { return };
+    while !queue.is_empty() {
+        let (sqr, steps) = queue.pop().unwrap();
+        let color = colors.colors[steps as usize % colors.colors.len()];
+        fill_center_square(&sqr, &mut carpet, color);
 
-    let new_len = sqr.len/3;
-    sierpinski_carpet(Square::new(sqr.x0,             sqr.y0,             new_len), &mut img, colors, steps - 1);
-    sierpinski_carpet(Square::new(sqr.x0,             sqr.y0 + new_len,   new_len), &mut img, colors, steps - 1);
-    sierpinski_carpet(Square::new(sqr.x0,             sqr.y0 + 2*new_len, new_len), &mut img, colors, steps - 1);
-    sierpinski_carpet(Square::new(sqr.x0 + new_len,   sqr.y0,             new_len), &mut img, colors, steps - 1);
-    sierpinski_carpet(Square::new(sqr.x0 + new_len,   sqr.y0 + 2*new_len, new_len), &mut img, colors, steps - 1);
-    sierpinski_carpet(Square::new(sqr.x0 + 2*new_len, sqr.y0,             new_len), &mut img, colors, steps - 1);
-    sierpinski_carpet(Square::new(sqr.x0 + 2*new_len, sqr.y0 + new_len,   new_len), &mut img, colors, steps - 1);
-    sierpinski_carpet(Square::new(sqr.x0 + 2*new_len, sqr.y0 + 2*new_len, new_len), &mut img, colors, steps - 1);
+        if steps == 0 { continue };
+
+        let new_len = sqr.len/3;
+        for i in 0..=2 {
+            for j in 0..=2 {
+                if i == 1 && j ==1 { continue; }
+                queue.push(
+                    (Square::new(
+                        sqr.x0 + i*new_len, 
+                        sqr.y0 + j*new_len, 
+                        new_len), 
+                    steps - 1));
+            }
+        }
+    }
+
+    carpet
 }
 
 fn fill_center_square(sqr: &Square, img: &mut RgbImage, color: Rgb<u8>) {
@@ -47,7 +53,7 @@ fn fill_center_square(sqr: &Square, img: &mut RgbImage, color: Rgb<u8>) {
     }
 }
 
-fn get_image_path(steps: u32, color_name: String) -> String {
+fn get_image_path(steps: u32, color_name: &str) -> String {
     let base_dir = "./";
     let base_file_name = "sierpinski_carpet";
     let file_ext = ".png";
@@ -57,7 +63,7 @@ fn get_image_path(steps: u32, color_name: String) -> String {
 fn image_exists(file_path: &str) -> bool {
     std::path::Path::new(file_path).exists()
 }
- 
+
 fn save_image(img: RgbImage, side: u32, file_path: String) {
     img.save(&file_path)
         .unwrap_or_else(
@@ -129,16 +135,24 @@ impl Colors {
 
 pub fn benchmark() {
     let mut sw = Stopwatch::new();
-    for steps in 0..=10 {
+    let iterations = 100;
+    println!("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
+    println!("-=-=-=-=-= Sierpiński carpet x{iterations} -=-=-=-=-=");
+    println!("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
+    for steps in 0..10 {
         sw.restart();
-        let mut side = (3 as u32).pow(steps);
-        if side == 1 { side = 3 };
-        let sqr = Square { x0: 0, y0: 0, len: side };
-        let black = Rgb([0, 0, 0]);
-        let square_colors = vec![Rgb([255, 255, 255])];
-        let mut img = RgbImage::from_fn(side, side, |_, _| black);
-        sierpinski_carpet(sqr, &mut img, &square_colors, steps);
-        println!("Sierpiński carpet with {steps} steps, image with sides: {side}x{side}, took {}ms", sw.elapsed_ms());
+        let side = cmp::max((3 as u32).pow(steps), 3);
+        for _ in 0..iterations {
+            let colors = Colors { 
+                name: String::from("Classic_Contrast"), 
+                background: Rgb([0, 0, 0]), 
+                colors: vec![Rgb([255, 255, 255])]};
+            sierpinski_carpet(
+                steps,
+                side,
+                colors);
+        }
+        println!("Steps: {steps}; Size: {side:>5}x{side:<5}; Avarage: {}ms", sw.elapsed_ms()/iterations);
     }
 }
 
