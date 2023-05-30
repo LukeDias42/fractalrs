@@ -18,10 +18,10 @@ pub fn create(steps: u32, color_option: u32) {
 fn sierpinski_carpet(steps: u32, side: u32, colors: Colors) -> RgbImage {
     let mut carpet = RgbImage::from_fn(side, side, |_, _| colors.background);
     let sqr = Square { x0: 0, y0: 0, len: side };
-    let mut queue = vec![(sqr, steps)];
+    let mut stack = vec![(sqr, steps)];
 
-    while !queue.is_empty() {
-        let (sqr, steps) = queue.pop().unwrap();
+    while !stack.is_empty() {
+        let (sqr, steps) = stack.pop().unwrap();
         let color = colors.colors[steps as usize % colors.colors.len()];
         fill_center_square(&sqr, &mut carpet, color);
 
@@ -31,7 +31,7 @@ fn sierpinski_carpet(steps: u32, side: u32, colors: Colors) -> RgbImage {
         for i in 0..=2 {
             for j in 0..=2 {
                 if i == 1 && j ==1 { continue; }
-                queue.push(
+                stack.push(
                     (Square::new(
                         sqr.x0 + i*new_len, 
                         sqr.y0 + j*new_len, 
