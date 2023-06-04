@@ -1,13 +1,11 @@
-use std::env;
 use input::Config;
-use sierpinski_carpet;
+use std::env;
 
 fn main() {
     let config = Config::build(env::args());
-    if !config.benchmark { 
-        sierpinski_carpet::create(config.steps, config.color_option) 
+    if config.benchmark {
+        sierpinski_carpet::benchmark()
     } else {
-        sierpinski_carpet::benchmark() 
+        sierpinski_carpet::create(config.steps, config.color_option)
     };
 }
-

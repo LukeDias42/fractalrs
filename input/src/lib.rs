@@ -3,16 +3,18 @@ use std::env;
 pub struct Config {
     pub steps: u32,
     pub benchmark: bool,
-    pub color_option: u32
+    pub color_option: u32,
 }
 
 impl Config {
-    pub fn build(
-            mut args: impl Iterator<Item = String>
-    ) -> Config {
+    pub fn build(mut args: impl Iterator<Item = String>) -> Config {
         if env::var("BENCHMARK").is_ok() {
             println!("Running benchnark.");
-            return Config { benchmark: true, steps: 0, color_option: 0 };
+            return Config {
+                benchmark: true,
+                steps: 0,
+                color_option: 0,
+            };
         }
 
         args.next();
@@ -41,7 +43,7 @@ impl Config {
         Config {
             steps,
             benchmark: false,
-            color_option
+            color_option,
         }
     }
 }

@@ -2,6 +2,12 @@ use image::{Rgb, RgbImage};
 use std::{cmp, process};
 use stopwatch::Stopwatch;
 
+/// Creates a file containing an image with the specified sierpinski carpet configuration.
+/// If the file with a certain configuration has already been created, does not create it again.
+///
+/// # Panics
+/// If the amount of steps is too large, your computer might not be able to handle creating
+/// an image large enough and storing it.
 pub fn create(steps: u32, color_option: u32) {
     let colors = Colors::get_colors(color_option);
     let file_path = get_image_path(steps, &colors.name);
@@ -10,34 +16,39 @@ pub fn create(steps: u32, color_option: u32) {
         return;
     }
 
-    let side = cmp::max(743, (3 as u32).pow(steps));
+    let side = cmp::max(743, (3u32).pow(steps));
     let carpet = sierpinski_carpet(steps, side, colors);
     save_image(carpet, side, file_path)
 }
 
 fn sierpinski_carpet(steps: u32, side: u32, colors: Colors) -> RgbImage {
     let mut carpet = RgbImage::from_fn(side, side, |_, _| colors.background);
-    let sqr = Square { x0: 0, y0: 0, len: side };
+    let sqr = Square {
+        starting_point: (0, 0),
+        len: side,
+    };
     let mut stack = vec![(sqr, steps)];
 
     while !stack.is_empty() {
         let (sqr, steps) = stack.pop().unwrap();
-        let color = colors.colors[steps as usize % colors.colors.len()];
-        fill_center_square(&sqr, &mut carpet, color);
+        let layer_color = colors.get_layer_color(steps as usize);
+        fill_center_square(&sqr, &mut carpet, layer_color);
 
-        if steps == 0 { continue };
+        if steps == 0 { continue; };
 
-        let new_len = sqr.len/3;
-        for i in 0..=2 {
-            for j in 0..=2 {
-                if i == 1 && j ==1 { continue; }
-                stack.push(
-                    (Square::new(
-                        sqr.x0 + i*new_len, 
-                        sqr.y0 + j*new_len, 
-                        new_len), 
-                    steps - 1));
-            }
+        let new_len = sqr.len / 3;
+        for i in 0..=8 {
+            if i == 4 { continue; }
+            stack.push((
+                Square {
+                    starting_point: (
+                        sqr.starting_point.0 + (i % 3) * new_len, 
+                        sqr.starting_point.1 + (i / 3) * new_len
+                    ),
+                    len: new_len
+                },
+                steps - 1,
+            ));
         }
     }
 
@@ -45,10 +56,13 @@ fn sierpinski_carpet(steps: u32, side: u32, colors: Colors) -> RgbImage {
 }
 
 fn fill_center_square(sqr: &Square, img: &mut RgbImage, color: Rgb<u8>) {
-    let inner_len = sqr.len/3;
+    let inner_len = sqr.len / 3;
     for x in 0..inner_len {
         for y in 0..inner_len {
-            img.put_pixel(inner_len + sqr.x0 + x, inner_len + sqr.y0 + y, color);
+            img.put_pixel(
+                inner_len + sqr.starting_point.0 + x, 
+                inner_len + sqr.starting_point.1 + y, 
+                color);
         }
     }
 }
@@ -65,69 +79,69 @@ fn image_exists(file_path: &str) -> bool {
 }
 
 fn save_image(img: RgbImage, side: u32, file_path: String) {
-    img.save(&file_path)
-        .unwrap_or_else(
-            |err| {
-                println!("An error occured while trying to save the image: {err}");
-                process::exit(1);
-            }
-        );
+    img.save(&file_path).unwrap_or_else(|err| {
+        println!("An error occured while trying to save the image: {err}");
+        process::exit(1);
+    });
     println!("Sierpiński carpet!\nFile: {file_path}\nImage size {side}x{side}");
 }
 
+/// Represents a Square
+/// The Starting point is the upper left corner
 struct Square {
-    x0: u32,
-    y0: u32,
-    len: u32
-}
-
-impl Square {
-    fn new(x0: u32, y0: u32, len: u32) -> Square {
-        Square { x0, y0, len }
-    }
+    starting_point: ( u32, u32 ),
+    len: u32,
 }
 
 struct Colors {
     name: String,
     background: Rgb<u8>,
-    colors: Vec<Rgb<u8>>
+    layers: Vec<Rgb<u8>>,
+}
+
+impl Colors {
+    fn get_layer_color(&self, steps: usize) -> Rgb<u8> {
+        self.layers[steps % self.layers.len()]
+    }
 }
 
 impl Colors {
     fn get_colors(option: u32) -> Colors {
         match option {
-            1 => Colors { 
-                name: String::from("Classic_Contrast"), 
-                background: Rgb([0, 0, 0]), 
-                colors: vec![Rgb([255, 255, 255])]},
-            2 => Colors { 
-                name: String::from("Inverted_Classic"), 
-                background: Rgb([255, 255, 255]), 
-                colors: vec![Rgb([0, 0, 0])]},
+            1 => Colors {
+                name: String::from("Classic_Contrast"),
+                background: Rgb([0, 0, 0]),
+                layers: vec![Rgb([255, 255, 255])],
+            },
+            2 => Colors {
+                name: String::from("Inverted_Classic"),
+                background: Rgb([255, 255, 255]),
+                layers: vec![Rgb([0, 0, 0])],
+            },
             3 => Colors {
                 name: String::from("Gold_Velvet"),
                 background: Rgb([63, 63, 116]),
-                colors: vec![Rgb([255, 188, 66]), Rgb([209, 74, 80])],
+                layers: vec![Rgb([255, 188, 66]), Rgb([209, 74, 80])],
             },
             4 => Colors {
                 name: String::from("Earthy_Tones"),
                 background: Rgb([85, 98, 112]),
-                colors: vec![Rgb([255, 193, 87]), Rgb([54, 179, 126]), Rgb([194, 62, 62])],
+                layers: vec![Rgb([255, 193, 87]), Rgb([54, 179, 126]), Rgb([194, 62, 62])],
             },
             5 => Colors {
                 name: String::from("Contrast_Harmony"),
                 background: Rgb([33, 33, 33]),
-                colors: vec![Rgb([239, 108, 0]), Rgb([181, 181, 181])],
+                layers: vec![Rgb([239, 108, 0]), Rgb([181, 181, 181])],
             },
             6 => Colors {
                 name: String::from("Bold_Neutrals"),
                 background: Rgb([64, 64, 64]),
-                colors: vec![Rgb([255, 145, 0]), Rgb([255, 188, 66]), Rgb([0, 0, 0])],
+                layers: vec![Rgb([255, 145, 0]), Rgb([255, 188, 66]), Rgb([0, 0, 0])],
             },
             _ => Colors {
                 name: String::from("Sophisticated_Duo"),
                 background: Rgb([48, 63, 159]),
-                colors: vec![Rgb([244, 143, 177]), Rgb([242, 203, 68])],
+                layers: vec![Rgb([244, 143, 177]), Rgb([242, 203, 68])],
             },
         }
     }
@@ -141,18 +155,18 @@ pub fn benchmark() {
     println!("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
     for steps in 0..10 {
         sw.restart();
-        let side = cmp::max((3 as u32).pow(steps), 3);
+        let side = cmp::max((3_u32).pow(steps), 3);
         for _ in 0..iterations {
-            let colors = Colors { 
-                name: String::from("Classic_Contrast"), 
-                background: Rgb([0, 0, 0]), 
-                colors: vec![Rgb([255, 255, 255])]};
-            sierpinski_carpet(
-                steps,
-                side,
-                colors);
+            let colors = Colors {
+                name: String::from("Classic_Contrast"),
+                background: Rgb([0, 0, 0]),
+                layers: vec![Rgb([255, 255, 255])],
+            };
+            sierpinski_carpet(steps, side, colors);
         }
-        println!("Steps: {steps}; Size: {side:>5}x{side:<5}; Avarage: {}ms", sw.elapsed_ms()/iterations);
+        println!(
+            "Steps: {steps}; Size: {side:>5}x{side:<5}; Avarage: {}ms",
+            sw.elapsed_ms() / iterations
+        );
     }
 }
-
